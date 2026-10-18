@@ -75,8 +75,17 @@ class Mission:
 
     @classmethod
     def from_csv(cls, file_name: str):
-        # You are required to implement this method
-        pass
+        # Read the CSV, skipping the header row (reference,cave_height,cave_depth).
+        # Result is a 2D array with one row per time step and one column per field.
+        data = np.genfromtxt(file_name, delimiter=',', skip_header=1)
+
+        # Split the columns into the three arrays the Mission dataclass expects.
+        reference = data[:, 0]
+        cave_height = data[:, 1]
+        cave_depth = data[:, 2]
+
+        # builds a Mission instance
+        return cls(reference, cave_height, cave_depth)
 
 
 class ClosedLoop:
@@ -93,11 +102,15 @@ class ClosedLoop:
         positions = np.zeros((T, 2))
         actions = np.zeros(T)
         self.plant.reset_state()
+        # Reset the controller's memory (previous error) so each simulation starts fresh
+        self.controller.reset()
 
         for t in range(T):
             positions[t] = self.plant.get_position()
             observation_t = self.plant.get_depth()
-            # Call your controller here
+            # Ask the controller for an action, given the reference and measured depth at time t
+            actions[t] = self.controller.control(mission.reference[t], observation_t)
+            # Advance the submarine one step using that action plus the disturbance
             self.plant.transition(actions[t], disturbances[t])
 
         return Trajectory(positions)
